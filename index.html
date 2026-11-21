@@ -83,6 +83,13 @@ code{font-family:"SF Mono",Menlo,monospace;font-size:12px;background:#f3f4f6;bor
 .plist{margin-top:6px;}
 .probcard{border:1px solid #e5e7eb;border-radius:10px;padding:10px 14px;margin:8px 0;display:flex;gap:12px;align-items:flex-start;background:#fff;}
 .probcard.on{border-color:#86efac;background:#f0fdf4;}
+.notebtn{font-size:11px;border:1px solid #cbd5e1;border-radius:999px;padding:1px 8px;cursor:pointer;background:#fff;color:#64748b;flex-shrink:0;vertical-align:middle}
+.notebtn:hover{border-color:#facc15;color:#a16207}
+.notebtn.has{background:#fef9c3;border-color:#facc15;color:#a16207;font-weight:600}
+.notebox{display:none;margin-top:8px}
+.notebox.open{display:block}
+.notebox textarea{width:100%;min-height:64px;box-sizing:border-box;border:1px solid #d1d5db;border-radius:8px;padding:8px 10px;font:13px/1.6 -apple-system,'PingFang SC','Microsoft YaHei',sans-serif;color:#1e293b;resize:vertical;background:#fffdf5}
+.notebox textarea:focus{outline:2px solid #fde68a;border-color:#facc15}
 .probmain{flex:1;min-width:0;}
 .ptitle{font-weight:600;font-size:14.5px;line-height:1.5;}
 .ptitle .star{color:var(--gold);font-weight:bold;}
@@ -155,12 +162,13 @@ footer{color:#94a3b8;font-size:12px;margin-top:36px;line-height:1.8;}
       <b class="star">★</b> 表示<b>期末真题</b>：出现在 2022–2025 年期末考试卷中的原题（编程网格期末 + OpenJudge cs101 期末）。算法族标题旁「★ 期末常考」＝该族在期末卷出现 ≥2 题，优先复习。<br>
       <b>⚑</b> 表示<b>复合题</b>（同时用到 ≥2 个算法族的思想）。<br>
       <b>最优算法</b>：一道题可用多种算法解答时，列出全部可行算法，<span class="atag opt"></span>金色徽章标出推荐的最优算法，其余以灰色标签附后。<br>
-      <b>难度</b>：<span class="badge d1">入门</span><span class="badge d2">基础</span><span class="badge d3">中等</span><span class="badge d4">较难</span><span class="badge d5">挑战</span>（点题面可展开题干描述；带链接的题可直接跳转 OpenJudge 题目页）。
+      <b>难度</b>：<span class="badge d1">入门</span><span class="badge d2">基础</span><span class="badge d3">中等</span><span class="badge d4">较难</span><span class="badge d5">挑战</span>（点题面可展开题干描述；带链接的题可直接跳转 OpenJudge 题目页）。<br>
+      <b>📝 注记</b>：每道题右下方有「📝 注记」按钮，点开可写下自己的思路、卡点和易错笔记，随打卡进度按用户保存在本机；有注记的题按钮会变黄，搜索框也能搜到注记内容。
     </div>
   </section>
 
   <div class="filters">
-    <input type="text" id="q" placeholder="🔍 搜索题名 / 算法标签 / 出处…">
+    <input type="text" id="q" placeholder="🔍 搜索题名 / 算法标签 / 出处 / 注记…">
     <label id="ffin">★ 只看期末真题</label>
     <label id="funtodo">只看未打卡</label>
   </div>
@@ -192,12 +200,12 @@ const DIFF = DATA.diffNames;
 const UKEY='jga_users', CKEY='jga_cur';
 let users = JSON.parse(localStorage.getItem(UKEY)||'[]');
 let cur = localStorage.getItem(CKEY)||'';
-let state = {p:{},f:{},pf:{}};
+let state = {p:{},f:{},pf:{},n:{}};
 function loadState(){
-  if(!cur){ state={p:{},f:{},pf:{}}; return; }
-  try{ state = JSON.parse(localStorage.getItem('jga_state_'+cur))||{p:{},f:{},pf:{}};
-  }catch(e){ state={p:{},f:{},pf:{}}; }
-  state.p=state.p||{}; state.f=state.f||{}; state.pf=state.pf||{};
+  if(!cur){ state={p:{},f:{},pf:{},n:{}}; return; }
+  try{ state = JSON.parse(localStorage.getItem('jga_state_'+cur))||{p:{},f:{},pf:{},n:{}};
+  }catch(e){ state={p:{},f:{},pf:{},n:{}}; }
+  state.p=state.p||{}; state.f=state.f||{}; state.pf=state.pf||{}; state.n=state.n||{};
 }
 function saveState(){ if(cur) localStorage.setItem('jga_state_'+cur, JSON.stringify(state)); }
 function saveUsers(){ localStorage.setItem(UKEY, JSON.stringify(users)); }
@@ -236,12 +244,13 @@ function problemCard(p){
   return `<div class="probcard" data-p="${p.idx}" data-fin="${p.fin?1:0}" data-grp="${p.grp}" id="pc${p.idx}">
     <div class="ck" data-ck="p:${p.idx}"></div>
     <div class="probmain">
-      <div class="ptitle">${star}${link}${flag}</div>
+      <div class="ptitle">${star}${link}${flag} <button class="notebtn" data-note="${p.idx}">📝 注记</button></div>
       <div class="meta">${tags}${multi}${badges}
         ${p.dt.length?`<span class="mini">数据类型: ${esc(p.dt.join(' / '))}</span>`:''}
         ${p.note?`<span class="mini">｜${esc(p.note)}</span>`:''}</div>
       <div class="srcs"><b>出现于：</b>${esc(p.srcs)}</div>
       ${desc}
+      <div class="notebox" id="nb${p.idx}"><textarea data-nta="${p.idx}" id="nta${p.idx}" placeholder="这题的注记：思路、卡在哪、易错点、以后复习要点…（自动保存）"></textarea></div>
     </div>
   </div>`;
 }
@@ -315,13 +324,34 @@ function renderAll(){
   });
   const total=probs.length, dn=Object.values(state.p).filter(Boolean).length;
   const pct=Math.round(dn/total*100);
+  const nn=Object.values(state.n).filter(v=>(v||'').trim()).length;
   document.getElementById('gprogbar').style.width=pct+'%';
-  document.getElementById('gprogtext').textContent=`题目打卡 ${dn}/${total}（${pct}%）`;
+  document.getElementById('gprogtext').textContent=`题目打卡 ${dn}/${total}（${pct}%） · 注记 ${nn} 条`;
   document.getElementById('curuser').textContent = cur?`当前用户：${cur}`:'未选择用户——先在左侧创建用户再打卡';
+  document.querySelectorAll('[data-note]').forEach(b=>{
+    const idx=b.dataset.note, has=!!(state.n[idx]||'').trim();
+    b.classList.toggle('has',has);
+    b.textContent = has?'📝 有注记':'📝 注记';
+    const box=document.getElementById('nb'+idx), ta=document.getElementById('nta'+idx);
+    if(box&&box.classList.contains('open')&&ta&&document.activeElement!==ta) ta.value=state.n[idx]||'';
+  });
   applyFilter();
 }
 /* ---------- click ---------- */
 document.addEventListener('click',e=>{
+  const nb=e.target.closest('[data-note]');
+  if(nb){
+    if(!cur){ alert('请先在左侧创建用户，再写注记～'); return; }
+    const idx=nb.dataset.note, box=document.getElementById('nb'+idx);
+    if(box){ box.classList.toggle('open');
+      if(box.classList.contains('open')){
+        const ta=document.getElementById('nta'+idx);
+        if(ta&&!ta.value) ta.value=state.n[idx]||'';
+        if(ta) ta.focus();
+      }
+    }
+    return;
+  }
   const ck=e.target.closest('[data-ck]');
   if(ck){
     if(!cur){ alert('请先在左侧创建用户，再开始打卡～'); return; }
@@ -346,6 +376,25 @@ document.getElementById('burger').onclick=()=>{
   if(window.innerWidth<=900){ document.body.classList.toggle('side-open'); }
   else { document.body.classList.toggle('side-hidden'); localStorage.setItem('jga_side', document.body.classList.contains('side-hidden')?'1':'0'); }
 };
+/* ---------- note input (debounced autosave) ---------- */
+const noteTimer={};
+document.addEventListener('input',e=>{
+  const ta=e.target.closest('textarea[data-nta]');
+  if(!ta) return;
+  const idx=ta.dataset.nta;
+  clearTimeout(noteTimer[idx]);
+  noteTimer[idx]=setTimeout(()=>{
+    if(!cur) return;
+    const v=ta.value.trim();
+    if(v) state.n[idx]=ta.value; else delete state.n[idx];
+    saveState();
+    const b=document.querySelector('[data-note="'+idx+'"]');
+    if(b){ b.classList.toggle('has',!!v); b.textContent=v?'📝 有注记':'📝 注记'; }
+    const dn=Object.values(state.p).filter(Boolean).length;
+    const nn=Object.values(state.n).filter(x=>(x||'').trim()).length;
+    document.getElementById('gprogtext').textContent=`题目打卡 ${dn}/${probs.length}（${Math.round(dn/probs.length*100)}%） · 注记 ${nn} 条`;
+  },300);
+});
 /* ---------- filter ---------- */
 let q='', onlyFin=false, onlyTodo=false;
 document.getElementById('q').addEventListener('input',e=>{q=e.target.value.trim().toLowerCase();applyFilter();});
@@ -361,7 +410,7 @@ function applyFilter(){
       if(onlyFin&&!p.fin) ok=false;
       if(onlyTodo&&state.p[String(p.idx)]) ok=false;
       if(q){
-        const hay=(p.title+' '+p.algo.join(' ')+' '+p.srcs+' '+(p.note||'')).toLowerCase();
+        const hay=(p.title+' '+p.algo.join(' ')+' '+p.srcs+' '+(p.note||'')+' '+(state.n[String(p.idx)]||'')).toLowerCase();
         if(!hay.includes(q)) ok=false;
       }
       el.classList.toggle('hidden',!ok);
@@ -391,7 +440,7 @@ document.getElementById('uadd').onclick=()=>{
 document.getElementById('usel').onchange=e=>switchUser(e.target.value);
 document.getElementById('udel').onclick=()=>{
   if(!cur) return;
-  if(!confirm(`删除用户「${cur}」的全部打卡记录？`)) return;
+  if(!confirm(`删除用户「${cur}」的全部打卡与注记记录？`)) return;
   localStorage.removeItem('jga_state_'+cur);
   users=users.filter(u=>u!==cur); saveUsers();
   cur=users[0]||''; localStorage.setItem(CKEY,cur);
