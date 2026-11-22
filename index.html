@@ -47,8 +47,18 @@ h2.sec{font-size:20px;color:var(--indigo-d);border-left:6px solid var(--indigo);
 .d1{background:#dcfce7;color:#15803d;}.d2{background:#d1fae5;color:#0d9488;}
 .d3{background:#fef9c3;color:#a16207;}.d4{background:#ffedd5;color:#c2410c;}.d5{background:#fee2e2;color:#b91c1c;}
 /* filter */
-.filters{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0;}
+.filters{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0;position:relative;}
 .filters input[type=text]{flex:1;min-width:200px;padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:13.5px;}
+#sugg{position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #e2e8f0;border-radius:10px;box-shadow:0 8px 24px rgba(15,23,42,.14);display:none;max-height:300px;overflow:auto;z-index:60;margin-top:4px}
+.sug{padding:7px 12px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;border-bottom:1px solid #f1f5f9}
+.sug:last-child{border-bottom:none}
+.sug:hover{background:#fef9c3}
+.sug .star{margin-right:2px}
+.sugmeta{margin-left:auto;font-size:11px;color:#94a3b8;white-space:nowrap;padding-left:10px}
+.sug.none{color:#94a3b8;cursor:default}
+.sug.none:hover{background:none}
+@keyframes flashhl{0%{background:#fef3c7;box-shadow:0 0 0 3px #facc15}100%{background:#fff;box-shadow:0 0 0 3px transparent}}
+.probcard.flash{animation:flashhl 1.4s ease-out 2}
 .filters label{display:flex;align-items:center;gap:5px;background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:6px 12px;font-size:13px;cursor:pointer;user-select:none;}
 .filters label.on{background:#fffbeb;border-color:var(--gold);color:#b45309;font-weight:600;}
 /* family */
@@ -168,7 +178,8 @@ footer{color:#94a3b8;font-size:12px;margin-top:36px;line-height:1.8;}
   </section>
 
   <div class="filters">
-    <input type="text" id="q" placeholder="🔍 搜索题名 / 算法标签 / 出处 / 注记…">
+    <input type="text" id="q" placeholder="🔍 搜索题名 / 算法标签 / 出处 / 注记…（回车跳转到第一题）">
+    <div id="sugg"></div>
     <label id="ffin">★ 只看期末真题</label>
     <label id="funtodo">只看未打卡</label>
   </div>
@@ -397,7 +408,7 @@ document.addEventListener('input',e=>{
 });
 /* ---------- filter ---------- */
 let q='', onlyFin=false, onlyTodo=false;
-document.getElementById('q').addEventListener('input',e=>{q=e.target.value.trim().toLowerCase();applyFilter();});
+document.getElementById('q').addEventListener('input',e=>{q=e.target.value.trim().toLowerCase();applyFilter();renderSugg();});
 document.getElementById('ffin').onclick=function(){onlyFin=!onlyFin;this.classList.toggle('on',onlyFin);applyFilter();};
 document.getElementById('funtodo').onclick=function(){onlyTodo=!onlyTodo;this.classList.toggle('on',onlyTodo);applyFilter();};
 function applyFilter(){
@@ -420,6 +431,53 @@ function applyFilter(){
     sec.classList.toggle('hidden', vis===0&&(q||onlyFin||onlyTodo));
   });
 }
+/* ---------- locate by name (suggestion dropdown) ---------- */
+const suggEl=document.getElementById('sugg');
+let suggItems=[];
+function famLabel(gi){ const f=fams.find(x=>x.i===gi); return f?(f.i+'. '+f.name):''; }
+function renderSugg(){
+  if(!q){ suggEl.style.display='none'; suggItems=[]; return; }
+  suggItems=probs.filter(p=>{
+    const hay=(p.title+' '+p.algo.join(' ')+' '+p.srcs+' '+(p.note||'')+' '+(state.n[String(p.idx)]||'')).toLowerCase();
+    return hay.includes(q);
+  }).slice(0,12);
+  suggEl.innerHTML = suggItems.length
+    ? suggItems.map((p,i)=>`<div class="sug" data-si="${i}">${p.fin?'<span class="star">★</span>':''}${esc(p.title)}<span class="sugmeta">${esc(famLabel(p.grp))} · ${DIFF[String(p.diff)]||''}${(state.n[String(p.idx)]||'').trim()?' · 📝':''}</span></div>`).join('')
+    : '<div class="sug none">无匹配题目</div>';
+  suggEl.style.display='block';
+}
+function gotoProb(p){
+  const el=document.getElementById('pc'+p.idx);
+  if(!el) return;
+  const sec=document.getElementById('fam'+p.grp);
+  if(el.classList.contains('hidden')||(sec&&sec.classList.contains('hidden'))){
+    q=''; document.getElementById('q').value='';
+    onlyFin=false; document.getElementById('ffin').classList.remove('on');
+    onlyTodo=false; document.getElementById('funtodo').classList.remove('on');
+    applyFilter();
+  }
+  el.scrollIntoView({behavior:'smooth',block:'center'});
+  setTimeout(()=>{
+    const rect=el.getBoundingClientRect();
+    if(rect.top<0||rect.top>window.innerHeight*0.9) el.scrollIntoView({block:'center'});
+  },450);
+  el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+  setTimeout(()=>el.classList.remove('flash'),3200);
+  suggEl.style.display='none';
+  if(window.innerWidth<=900) document.body.classList.remove('side-open');
+}
+suggEl.addEventListener('click',e=>{
+  const d=e.target.closest('.sug');
+  if(!d||d.classList.contains('none')) return;
+  gotoProb(suggItems[+d.dataset.si]);
+});
+document.getElementById('q').addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&suggItems.length) gotoProb(suggItems[0]);
+  if(e.key==='Escape') suggEl.style.display='none';
+});
+document.addEventListener('click',e=>{
+  if(!e.target.closest('#sugg')&&!e.target.closest('#q')) suggEl.style.display='none';
+});
 /* ---------- users ---------- */
 function renderUsers(){
   const sel=document.getElementById('usel');
